@@ -7,7 +7,7 @@ import MobileBranding from "./mobile/MobileBranding";
 import Navigation from "./Navigation";
 import Settings from "./Settings";
 
-const pages: string[] = [];
+const pages: string[] = ['Home'];
 
 function Header() {
   return (
