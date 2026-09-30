@@ -15,7 +15,6 @@ import SendIcon from "@mui/icons-material/Send";
 import { useCreateMessage } from "../../hooks/useCreateMessage";
 import { useEffect, useRef, useState } from "react";
 import { useGetMessages } from "../../hooks/useGetMessages";
-import { alignProperty } from "@mui/material/styles/cssUtils";
 
 const Chat = () => {
   const params = useParams();
@@ -55,8 +54,8 @@ const Chat = () => {
           <Grid container sx={{ alignItems: "center", marginBottom: "1rem" }}>
             <Grid
               size={{
-                xs: 3,
-                md: 1,
+                xs: 2,
+                lg: 1,
               }}
             >
               <Avatar src="" sx={{ width: 52, height: 52 }} />
@@ -64,8 +63,8 @@ const Chat = () => {
 
             <Grid
               size={{
-                xs: 9,
-                md: 11,
+                xs: 10,
+                lg: 11,
               }}
             >
               <Stack>
@@ -92,6 +91,7 @@ const Chat = () => {
           justifySelf: "flex-end",
           alignItems: "center",
           width: "100%",
+          margin: "1rem",
         }}
       >
         <InputBase
