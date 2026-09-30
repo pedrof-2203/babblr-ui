@@ -5345,6 +5345,7 @@ __metadata:
     "@types/react-dom": "npm:^19.3.0"
     concurrently: "npm:^10.0.5"
     graphql: "npm:^17.0.2"
+    graphql-ws: "npm:^6.3.0"
     localforage: "npm:^1.10.0"
     match-sorter: "npm:^8.3.0"
     react: "npm:^19.3.0"
@@ -8584,7 +8585,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"graphql-ws@npm:^6.0.6":
+"graphql-ws@npm:^6.0.6, graphql-ws@npm:^6.3.0":
   version: 6.3.0
   resolution: "graphql-ws@npm:6.3.0"
   peerDependencies:
