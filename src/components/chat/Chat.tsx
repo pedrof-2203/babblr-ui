@@ -16,19 +16,28 @@ import { useCreateMessage } from "../../hooks/useCreateMessage";
 import { useEffect, useRef, useState } from "react";
 import { useGetMessages } from "../../hooks/useGetMessages";
 import { useMessageCreated } from "../../hooks/useMessageCreated";
+import { MessageFragmentFragment as Message } from "../../gql/graphql";
 
 const Chat = () => {
   const params = useParams();
   const [message, setMessage] = useState("");
   const chatId = params._id!;
   const { data } = useGetChat({ _id: chatId });
-  const [createMessage] = useCreateMessage(chatId);
-  const { data: messages } = useGetMessages({ chatId });
+  const [createMessage] = useCreateMessage();
+  const { data: existingMessages } = useGetMessages({ chatId });
+  const [messages, setMessages] = useState<Message[]>([]);
   const divRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
-  const { data: latestMessage } = useMessageCreated({ chatId });
+  
+  useMessageCreated({ chatId });
 
   const scrollToBottom = () => divRef.current?.scrollIntoView();
+
+  useEffect(() => {
+    if (existingMessages) {
+      setMessages(existingMessages.messages);
+    }
+  }, [existingMessages]);
 
   useEffect(() => {
     setMessage("");
@@ -52,36 +61,42 @@ const Chat = () => {
     <Stack sx={{ height: "100%", justifyContent: "space-between" }}>
       <h1>{data?.chat.name}</h1>
       <Box sx={{ maxHeight: "70vh", overflow: "auto" }}>
-        {messages?.messages.map((message) => (
-          <Grid container sx={{ alignItems: "center", marginBottom: "1rem" }}>
-            <Grid
-              size={{
-                xs: 2,
-                lg: 1,
-              }}
-            >
-              <Avatar src="" sx={{ width: 52, height: 52 }} />
-            </Grid>
+        {messages && [...messages]
+          .sort(
+            (messageA, messageB) =>
+              new Date(messageA.createdAt as Date).getTime() -
+              new Date(messageB.createdAt as Date).getTime(),
+          )
+          .map((message) => (
+            <Grid container sx={{ alignItems: "center", marginBottom: "1rem" }}>
+              <Grid
+                size={{
+                  xs: 2,
+                  lg: 1,
+                }}
+              >
+                <Avatar src="" sx={{ width: 52, height: 52 }} />
+              </Grid>
 
-            <Grid
-              size={{
-                xs: 10,
-                lg: 11,
-              }}
-            >
-              <Stack>
-                <Paper sx={{ width: "fit-content" }}>
-                  <Typography sx={{ padding: ".9rem" }}>
-                    {message.content}
+              <Grid
+                size={{
+                  xs: 10,
+                  lg: 11,
+                }}
+              >
+                <Stack>
+                  <Paper sx={{ width: "fit-content" }}>
+                    <Typography sx={{ padding: ".9rem" }}>
+                      {message.content}
+                    </Typography>
+                  </Paper>
+                  <Typography variant="caption" sx={{ marginLeft: ".25rem" }}>
+                    {new Date(message.createdAt as Date).toLocaleTimeString()}
                   </Typography>
-                </Paper>
-                <Typography variant="caption" sx={{ marginLeft: ".25rem" }}>
-                  {new Date(message.createdAt as Date).toLocaleTimeString()}
-                </Typography>
-              </Stack>
+                </Stack>
+              </Grid>
             </Grid>
-          </Grid>
-        ))}
+          ))}
 
         <div ref={divRef} />
       </Box>
