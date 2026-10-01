@@ -15,7 +15,6 @@ import SendIcon from "@mui/icons-material/Send";
 import { useCreateMessage } from "../../hooks/useCreateMessage";
 import { useEffect, useRef, useState } from "react";
 import { useGetMessages } from "../../hooks/useGetMessages";
-import { useMessageCreated } from "../../hooks/useMessageCreated";
 import { MessageFragmentFragment as Message } from "../../gql/graphql";
 
 const Chat = () => {
@@ -29,8 +28,6 @@ const Chat = () => {
   const divRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   
-  useMessageCreated({ chatId });
-
   const scrollToBottom = () => divRef.current?.scrollIntoView();
 
   useEffect(() => {

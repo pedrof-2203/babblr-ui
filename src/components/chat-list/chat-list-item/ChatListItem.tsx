@@ -37,7 +37,8 @@ const ChatListItem = ({ chat, selected }: ChatListProps) => {
                 >
                   {chat.latestMessage?.user?.username || ""}
                 </Typography>
-                {" " + chat.latestMessage?.content || ""}
+                {chat.latestMessage?.content &&
+                  " " + chat.latestMessage?.content}
               </>
             }
           />
