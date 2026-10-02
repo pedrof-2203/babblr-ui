@@ -1,4 +1,4 @@
-import { useLocation, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useGetChat } from "../../hooks/useGetChat";
 import {
   Avatar,
@@ -13,9 +13,10 @@ import {
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import { useCreateMessage } from "../../hooks/useCreateMessage";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useGetMessages } from "../../hooks/useGetMessages";
-import { MessageFragmentFragment as Message } from "../../gql/graphql";
+import { PAGE_SIZE } from "../../constants/page-size";
+import { useCountMessages } from "../../hooks/useCountMessages";
 
 const Chat = () => {
   const params = useParams();
@@ -23,23 +24,97 @@ const Chat = () => {
   const chatId = params._id!;
   const { data } = useGetChat({ _id: chatId });
   const [createMessage] = useCreateMessage();
-  const { data: existingMessages } = useGetMessages({ chatId });
-  const [messages, setMessages] = useState<Message[]>([]);
-  const divRef = useRef<HTMLDivElement | null>(null);
-  const location = useLocation();
-  
-  const scrollToBottom = () => divRef.current?.scrollIntoView();
+  const {
+    data: existingMessages,
+    fetchMore,
+    loading,
+  } = useGetMessages({
+    chatId,
+    skip: 0,
+    limit: PAGE_SIZE,
+  });
+  const messages = existingMessages?.messages;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const initializedChat = useRef<string | null>(null);
+  const previousScrollTop = useRef(0);
+  const pendingPage = useRef<{
+    chatId: string;
+    height: number;
+    top: number;
+    messages: typeof messages;
+  } | null>(null);
+
+  const { messagesCount, countMessages } = useCountMessages(chatId);
 
   useEffect(() => {
-    if (existingMessages) {
-      setMessages(existingMessages.messages);
-    }
-  }, [existingMessages]);
+    countMessages();
+  }, [countMessages]);
+
+  const scrollToBottom = () => {
+    const container = scrollRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+    previousScrollTop.current = container.scrollTop;
+  };
 
   useEffect(() => {
     setMessage("");
-    scrollToBottom();
-  }, [location, messages]);
+  }, [chatId]);
+
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    if (initializedChat.current !== chatId) {
+      pendingPage.current = null;
+      if (!messages) return;
+      initializedChat.current = chatId;
+      scrollToBottom();
+      return;
+    }
+
+    const page = pendingPage.current;
+    if (page && page.chatId === chatId && page.messages !== messages) {
+      container.scrollTop = page.top + container.scrollHeight - page.height;
+      previousScrollTop.current = container.scrollTop;
+      pendingPage.current = null;
+    }
+  }, [chatId, messages]);
+
+  const handleScroll = async () => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const scrollingUp = container.scrollTop < previousScrollTop.current;
+    previousScrollTop.current = container.scrollTop;
+    if (
+      !scrollingUp ||
+      container.scrollTop > 50 ||
+      loading ||
+      pendingPage.current ||
+      !messages ||
+      messagesCount === undefined ||
+      messages.length >= messagesCount
+    )
+      return;
+
+    const page = {
+      chatId,
+      height: container.scrollHeight,
+      top: container.scrollTop,
+      messages,
+    };
+    pendingPage.current = page;
+    try {
+      const result = await fetchMore({ variables: { skip: messages.length } });
+      if (!result.data?.messages.length && pendingPage.current === page) {
+        pendingPage.current = null;
+      }
+    } catch {
+      // Release the guard so the next upward scroll can retry.
+      if (pendingPage.current === page) pendingPage.current = null;
+    }
+  };
 
   const handleCreateMessage = async () => {
     createMessage({
@@ -57,45 +132,53 @@ const Chat = () => {
   return (
     <Stack sx={{ height: "100%", justifyContent: "space-between" }}>
       <h1>{data?.chat.name}</h1>
-      <Box sx={{ maxHeight: "70vh", overflow: "auto" }}>
-        {messages && [...messages]
-          .sort(
-            (messageA, messageB) =>
-              new Date(messageA.createdAt as Date).getTime() -
-              new Date(messageB.createdAt as Date).getTime(),
-          )
-          .map((message) => (
-            <Grid container sx={{ alignItems: "center", marginBottom: "1rem" }}>
+      <Box
+        ref={scrollRef}
+        onScroll={handleScroll}
+        sx={{ maxHeight: "70vh", overflow: "auto", overflowAnchor: "none" }}
+      >
+        {messages &&
+          [...messages]
+            .sort(
+              (messageA, messageB) =>
+                new Date(messageA.createdAt as Date).getTime() -
+                new Date(messageB.createdAt as Date).getTime(),
+            )
+            .map((message) => (
               <Grid
-                size={{
-                  xs: 2,
-                  lg: 1,
-                }}
+                key={message._id}
+                container
+                sx={{ alignItems: "center", marginBottom: "1rem" }}
               >
-                <Avatar src="" sx={{ width: 52, height: 52 }} />
-              </Grid>
+                <Grid
+                  size={{
+                    xs: 2,
+                    lg: 1,
+                  }}
+                >
+                  <Avatar src="" sx={{ width: 52, height: 52 }} />
+                </Grid>
 
-              <Grid
-                size={{
-                  xs: 10,
-                  lg: 11,
-                }}
-              >
-                <Stack>
-                  <Paper sx={{ width: "fit-content" }}>
-                    <Typography sx={{ padding: ".9rem" }}>
-                      {message.content}
+                <Grid
+                  size={{
+                    xs: 10,
+                    lg: 11,
+                  }}
+                >
+                  <Stack>
+                    <Paper sx={{ width: "fit-content" }}>
+                      <Typography sx={{ padding: ".9rem" }}>
+                        {message.content}
+                      </Typography>
+                    </Paper>
+                    <Typography variant="caption" sx={{ marginLeft: ".25rem" }}>
+                      {new Date(message.createdAt as Date).toLocaleTimeString()}{" "}
+                      {new Date(message.createdAt as Date).toLocaleDateString()}
                     </Typography>
-                  </Paper>
-                  <Typography variant="caption" sx={{ marginLeft: ".25rem" }}>
-                    {new Date(message.createdAt as Date).toLocaleTimeString()}
-                  </Typography>
-                </Stack>
+                  </Stack>
+                </Grid>
               </Grid>
-            </Grid>
-          ))}
-
-        <div ref={divRef} />
+            ))}
       </Box>
 
       <Paper

@@ -1,5 +1,6 @@
 import {
   Avatar,
+  Box,
   Divider,
   ListItem,
   ListItemAvatar,
@@ -29,7 +30,7 @@ const ChatListItem = ({ chat, selected }: ChatListProps) => {
           <ListItemText
             primary={chat.name}
             secondary={
-              <>
+              <Box>
                 <Typography
                   component="span"
                   variant="body2"
@@ -37,9 +38,20 @@ const ChatListItem = ({ chat, selected }: ChatListProps) => {
                 >
                   {chat.latestMessage?.user?.username || ""}
                 </Typography>
-                {chat.latestMessage?.content &&
-                  " " + chat.latestMessage?.content}
-              </>
+
+                <div
+                  style={{
+                    overflow: "hidden",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 1,
+                    lineClamp: 1,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                >
+                  {chat.latestMessage?.content &&
+                    " " + chat.latestMessage?.content}
+                </div>
+              </Box>
             }
           />
         </ListItemButton>
