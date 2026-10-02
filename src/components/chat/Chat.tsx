@@ -17,12 +17,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useGetMessages } from "../../hooks/useGetMessages";
 import { PAGE_SIZE } from "../../constants/page-size";
 import { useCountMessages } from "../../hooks/useCountMessages";
+import { useGetMe } from "../../hooks/useGetMe";
 
 const Chat = () => {
   const params = useParams();
   const [message, setMessage] = useState("");
   const chatId = params._id!;
   const { data } = useGetChat({ _id: chatId });
+  const { data: currentUser } = useGetMe();
   const [createMessage] = useCreateMessage();
   const {
     data: existingMessages,
@@ -148,24 +150,32 @@ const Chat = () => {
               <Grid
                 key={message._id}
                 container
-                sx={{ alignItems: "center", marginBottom: "1rem" }}
+                sx={{
+                  alignItems: "center",
+                  marginBottom: "1rem",
+                  justifyContent:
+                    message.user._id === currentUser?.me._id
+                      ? "flex-end"
+                      : "flex-start",
+                }}
               >
-                <Grid
-                  size={{
-                    xs: 2,
-                    lg: 1,
-                  }}
-                >
-                  <Avatar src="" sx={{ width: 52, height: 52 }} />
-                </Grid>
-
                 <Grid
                   size={{
                     xs: 10,
                     lg: 11,
                   }}
                 >
-                  <Stack>
+                  <Stack
+                    sx={{
+                      alignItems:
+                        message.user._id === currentUser?.me._id
+                          ? "flex-end"
+                          : "flex-start",
+                    }}
+                  >
+                    <Typography sx={{ marginLeft: ".25rem" }} variant="caption">
+                      {message.user.username}
+                    </Typography>
                     <Paper sx={{ width: "fit-content" }}>
                       <Typography sx={{ padding: ".9rem" }}>
                         {message.content}
