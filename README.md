@@ -51,7 +51,7 @@ src/
   interfaces/            Shared UI types
   utils/                 Error handling and logout helpers
   setupTests.ts          jest-dom setup
-.env.example             Partial local environment example
+.env.example             Docker and local environment example
 codegen.ts               Schema source and generation settings
 package.json             Dependencies and scripts
 tsconfig.json            Strict TypeScript configuration
@@ -84,7 +84,7 @@ REACT_APP_API_URL=http://localhost:3000
 REACT_APP_WS_URL=localhost:3001
 ```
 
-The tracked `.env.example` includes only `REACT_APP_API_URL`; add `REACT_APP_WS_URL` if you copy that file.
+The tracked `.env.example` defaults to Docker networking. If you copy it for `yarn start`, change `REACT_APP_WS_URL` to `localhost:3001`; `BACKEND_URL` is used only by Docker.
 
 The HTTP URL deliberately points to the frontend development server. The `proxy` setting in `package.json` forwards API requests to `http://localhost:3001`, keeping browser HTTP requests on the frontend origin. WebSocket subscriptions connect directly to the backend on port 3001.
 
@@ -120,6 +120,74 @@ The static application is written to `build/`. Configure the hosting server to s
 Set the API variables for the deployment before building. The development proxy does not ship with the static build; configure API routing on the hosting infrastructure. HTTP calls do not explicitly enable cross-origin credentials, so a separate API origin may require changes to the client and backend authentication configuration.
 
 The WebSocket URL currently hardcodes `ws://` in `src/constants/apollo-client.ts`. An HTTPS deployment needs a code change to support `wss://`, plus a backend or proxy that accepts secure WebSocket connections.
+
+## Running with Docker
+
+### Prerequisites and configuration
+
+Install Docker Engine with the Compose plugin, or Docker Desktop, and start its Linux container engine. No host Node.js or Yarn installation is needed.
+
+This is a single-package frontend, not a monorepo. The `pnpm-workspace.yaml` only contains dependency build allowances; Yarn and `yarn.lock` are used for the image. The build stage uses Node.js 24 and Yarn 4.18.0 with an immutable install. It includes development dependencies for compilation and uses the committed `src/gql/` files, so no running backend or code generation is required to build. There are no additional application system packages to install. The final image contains the compiled `build/` assets and official Alpine Nginx, running as its non-root `nginx` user on port 8080. Node.js and dependencies stay in the build stage.
+
+A compatible backend is **required for login, chats, and messaging**. Start it separately on host port 3001 with the interfaces in [Backend integration](#backend-integration). This repository supplies no backend image, database definition, migrations, or seed commands; follow the backend project's setup instructions. On Linux, the backend must listen on an interface reachable from Docker (not only `127.0.0.1`).
+
+Create your local configuration, unless `.env` already exists:
+
+```sh
+cp .env.example .env
+```
+
+PowerShell equivalent: `Copy-Item .env.example .env`. For an existing `.env`, compare and update these values:
+
+| Variable | Docker default/example | When to change it |
+| --- | --- | --- |
+| `REACT_APP_API_URL` | `http://localhost:3000` in the example; empty when omitted in Compose | Public frontend HTTP origin, without trailing slash. Empty uses the current browser origin. |
+| `REACT_APP_WS_URL` | `localhost:3000` | Public frontend host and port, without scheme or path. For Docker, use port 3000 so subscriptions pass through Nginx. |
+| `BACKEND_URL` | `http://host.docker.internal:3001` | Backend origin reachable **from the container**, without path or trailing slash. Do not use `localhost` for a backend on the host. |
+
+All values have Docker defaults, so `.env` is optional for the default local setup. No credentials are required by the image. `REACT_APP_*` values are public, compiled into JavaScript, and must never contain secrets. Compose reads them from `.env` as **build arguments**; changing them requires rebuilding. `BACKEND_URL` is a runtime Nginx setting and must not contain credentials. Local `.env` files are excluded from the build context.
+
+### Start and stop with Compose (recommended)
+
+After starting the separate backend:
+
+```sh
+docker compose up --build -d
+docker compose ps
+docker compose logs -f ui
+```
+
+Open [http://localhost:3000](http://localhost:3000). Host port 3000 maps to container port 8080. Nginx serves browser routes and forwards `/graphql` (including WebSocket upgrades), `/auth/*`, `/chats/count`, and `/messages/count/:chatId` to `BACKEND_URL`, keeping cookie-based HTTP authentication on the same origin. The static UI can start without the backend, but API requests will fail until it is reachable. The `/healthz` health check verifies Nginx only, not backend availability.
+
+Stop and remove the frontend container and Compose network:
+
+```sh
+docker compose down
+```
+
+There are no persistent frontend volumes or initialization commands. Backend data and persistence are managed by the separate backend. Compose does not start or delete any database.
+
+After dependency, source, or public configuration changes, run `docker compose up --build -d` again. For only a `BACKEND_URL` change, run `docker compose up -d` to recreate the service with the new value. Use `docker compose build --pull` to refresh base images, followed by `docker compose up -d`.
+
+### Standalone container
+
+The same defaults work without Compose:
+
+```sh
+docker build -t babblr-ui:local .
+docker run -d --name babblr-ui --env-file .env --add-host host.docker.internal:host-gateway -p 3000:8080 babblr-ui:local
+docker logs -f babblr-ui
+docker stop babblr-ui
+docker rm babblr-ui
+```
+
+Create `.env` first for the `--env-file` command, or omit that option to use the default backend. Unlike Compose, `docker build` does not read `.env`. Supplying `REACT_APP_*` with `docker run --env-file` cannot change compiled browser settings. To change those settings, pass explicit build arguments, then recreate the container:
+
+```sh
+docker build -t babblr-ui:local --build-arg REACT_APP_API_URL=http://localhost:3000 --build-arg REACT_APP_WS_URL=localhost:3000 .
+```
+
+For access from another machine, use the frontend's browser-accessible hostname instead of `localhost` in the public build values. Docker service names belong only in `BACKEND_URL` and require a shared Docker network. The backend hostname must resolve when Nginx starts; restart the UI if the backend's IP changes. The current client hardcodes `ws://`; an HTTPS deployment still requires the `wss://` client change described above and TLS termination. This setup serves HTTP locally.
 
 ## Backend integration
 
